@@ -48,7 +48,7 @@ def main():
     profile_name = "CIROH_USER"  # Replace with your AWS credentials file profile name
     os.environ['AWS_PROFILE'] = profile_name
 
-    file_path = Path("/projects/mhpi/yxs275/DM_output/HydroFabric_forward_1980_2019_From_dPL_local_daymet_v6_2v18_2_oneGPU_dynamic_k0_1980_1995")
+    file_path = Path("/projects/mhpi/yxs275/DM_output/HydroFabric_forward_1980_2019_From_dPL_local_daymet_v6_2v18_2_oneGPU_dynamic_k0_1980_1995_new")
     bucket="mhpi-spatial"
     prefix="hydrofabric_v2.2_dhbv_retrospective"
     storage_config = icechunk.s3_storage(
