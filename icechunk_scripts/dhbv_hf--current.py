@@ -10,6 +10,14 @@ import zarr
 from icechunk.xarray import to_icechunk
 
 
+MODEL_NAME = 'dhbv'
+LOCAL_SIM_PATH = Path(f"/gpfs/leoglonz/multiscale/output/forward_sim/hfv2.2/sim1980-2019/{MODEL_NAME.upper()[1:]}")
+LOCAL_SAVE_DESTINATION = Path(f"/projects/mhpi/leoglonz/multiscale/output/forward_sim/hfv2.2/sim1980-2019/_icechunk/{MODEL_NAME}")
+BUCKET = "mhpi-spatial"
+PREFIX = f"hydrofabric_v2.2_{MODEL_NAME}_retrospective"
+
+
+
 def create_ds(root, key, id_to_area, date_range):
     local_divides = root[key]["divide_id"][:]
     runoff = root[key]["Qr"][:].astype(np.float32)
@@ -39,27 +47,28 @@ def create_ds(root, key, id_to_area, date_range):
             divide_id=(["divide_id"], local_divides),
             time=(["time"], date_range)
         ),
-        attrs=dict(description="Runoff outputs from dhbv2.0 at the HFv2.2 catchment scale"),
+        attrs=dict(description=f"Runoff outputs from {MODEL_NAME} at the HFv2.2 catchment scale"),
     )
     return ds
 
 
 def main():
-    profile_name = "CIROH_USER"  # Replace with your AWS credentials file profile name
+    # if MODEL_NAME == 'dhbv':
+    #     raise ValueError("Do not overwrite dhbv.")
+
+    profile_name = "default"  # Replace with your AWS credentials file profile name
     os.environ['AWS_PROFILE'] = profile_name
 
-    file_path = Path("/projects/mhpi/yxs275/DM_output/HydroFabric_forward_1980_2019_From_dPL_local_daymet_v6_2v18_2_oneGPU_dynamic_k0_1980_1995_new")
-    bucket="mhpi-spatial"
-    prefix="hydrofabric_v2.2_dhbv_retrospective"
-    storage_config = icechunk.s3_storage(
-        bucket=bucket, prefix=prefix, region="us-east-2", from_env=True
-    )
+    # storage_config = icechunk.s3_storage(
+    #     bucket=BUCKET, prefix=PREFIX, region="us-east-2", from_env=True
+    # )
+    storage_config = icechunk.local_filesystem_storage(path=LOCAL_SAVE_DESTINATION)
     repo = icechunk.Repository.create(storage_config)
     session = repo.writable_session("main")
 
-    if file_path.exists() is False:
-        raise FileNotFoundError(f"Cannot find: {file_path}")
-    root = zarr.open_group(file_path)
+    if LOCAL_SIM_PATH.exists() is False:
+        raise FileNotFoundError(f"Cannot find: {LOCAL_SIM_PATH}")
+    root = zarr.open_group(LOCAL_SIM_PATH)
 
     gdf = gpd.read_file("/projects/mhpi/data/hydrofabric/v2.2/conus_nextgen.gpkg", layer="flowpaths")
     gdf["_id"] = [int(float(_id.split("-")[1])) for _id in gdf["divide_id"]]
@@ -91,6 +100,8 @@ def main():
             id_to_area=id_to_area,
             date_range=date_range
         )
+        ds["divide_id"] = ds["divide_id"].astype(object)  # forcing to object to match existing data
+
         to_icechunk(ds, session, append_dim='divide_id')
         if i % 5 == 0:
             msg = f"Uploaded groups {zone_keys[i-5:i]} to S3"
